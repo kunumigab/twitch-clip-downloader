@@ -6,12 +6,12 @@ luego a YouTube u otra plataforma).
 
 ## Stack recomendado
 
-**Python 3.12** + **Docker**
+**Python 3.12** + **Podman** (con Quadlet para systemd)
 
 - `yt-dlp`: descarga los clips (soporta URLs de clips de Twitch de forma nativa).
 - API Helix de Twitch (`requests`): lista los clips de un canal con título, fecha y URL.
 - Sin base de datos: un archivo de estado JSON evita re-descargas.
-- Docker: imagen única, portable a cualquier máquina/NAS/VPS.
+- Podman + Quadlet: imagen única, portable, rootless y gestionada por systemd (timer incluido).
 
 Alternativas consideradas:
 - Node.js: viable, pero el soporte de Twitch en yt-dlp (Python) es más robusto.
@@ -23,8 +23,9 @@ Alternativas consideradas:
 ```
 .
 ├── AGENTS.md            # este archivo (seguimiento del proyecto)
-├── Dockerfile
-├── docker-compose.yml
+├── Dockerfile                     # usado por podman build
+├── twitch-clip-downloader.container  # unit Quadlet (systemd)
+├── twitch-clip-downloader.timer      # timer systemd (ejecución periódica)
 ├── requirements.txt
 ├── config.example.json  # copia a config.json y edita
 ├── src/
@@ -46,8 +47,13 @@ Alternativas consideradas:
 ## Uso
 
 ```bash
-# Docker (recomendado)
-docker compose run --rm downloader
+# Podman (recomendado)
+podman build -t twitch-clip-downloader:latest .
+podman run --rm -v ./output:/app/output:Z -v ./config.json:/app/config.json:ro,Z twitch-clip-downloader:latest
+
+# Quadlet (systemd, rootless): ver cabecera de twitch-clip-downloader.container
+#   cp twitch-clip-downloader.container twitch-clip-downloader.timer ~/.config/containers/systemd/
+#   systemctl --user daemon-reload && systemctl --user enable --now twitch-clip-downloader.timer
 
 # Local
 pip install -r requirements.txt
@@ -66,7 +72,7 @@ Opciones:
 - [x] Descarga con yt-dlp organizada por fecha + metadatos JSON
 - [x] Estado persistente (`output/.downloaded.json`) para no re-descargar
 - [ ] Subida automática a YouTube (pendiente, requiere OAuth de YouTube)
-- [ ] Programación periódica (cron / `docker compose` con restart + sleep, o Task Scheduler)
+- [x] Programación periódica vía timer de systemd + Quadlet (`twitch-clip-downloader.timer`)
 - [ ] Renombrado/plantillas de título para YouTube
 
 ## Notas y decisiones
@@ -79,3 +85,4 @@ Opciones:
 ## Historial
 
 - 2026-11-14: Creación inicial del proyecto (Python + yt-dlp + Helix API + Docker).
+- 2026-11-14: Docker reemplazado por Podman + Quadlet (unit `.container` + `.timer`).

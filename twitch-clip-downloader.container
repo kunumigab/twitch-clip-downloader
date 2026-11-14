@@ -1,0 +1,32 @@
+# Quadlet unit para Podman.
+# Instalación (rootless):
+#   mkdir -p ~/.config/containers/systemd
+#   cp twitch-clip-downloader.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user start twitch-clip-downloader.service
+#
+# Ajusta las rutas de Volume a tu máquina antes de copiarlo.
+
+[Unit]
+Description=Twitch Clip Downloader
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=twitch-clip-downloader:latest
+# Construir la imagen primero:
+#   podman build -t twitch-clip-downloader:latest .
+Volume=%h/twitch-clip-downloader/output:/app/output:Z
+Volume=%h/twitch-clip-downloader/config.json:/app/config.json:ro,Z
+# Alternativa con variables de entorno en lugar de config.json:
+# Environment=TWITCH_CLIENT_ID=xxx
+# Environment=TWITCH_CLIENT_SECRET=yyy
+# Environment=TWITCH_CHANNELS=canal1,canal2
+
+[Service]
+# Ejecución única (oneshot). Para programarlo periódicamente,
+# crea un .timer de systemd junto a este archivo.
+Type=oneshot
+
+[Install]
+WantedBy=default.target

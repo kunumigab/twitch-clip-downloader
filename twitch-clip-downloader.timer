@@ -1,0 +1,15 @@
+# Timer de systemd para ejecutar el downloader periódicamente.
+# Instalación (rootless):
+#   cp twitch-clip-downloader.timer ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now twitch-clip-downloader.timer
+
+[Unit]
+Description=Ejecutar Twitch Clip Downloader periódicamente
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
