@@ -13,9 +13,11 @@ After=network-online.target
 Wants=network-online.target
 
 [Container]
-Image=twitch-clip-downloader:latest
-# Construir la imagen primero:
-#   podman build -t twitch-clip-downloader:latest .
+# Imagen publicada por GitHub Actions en GHCR.
+# Sustituye OWNER/REPO por tu usuario/organización y repositorio.
+Image=ghcr.io/OWNER/REPO:latest
+# Si el paquete es privado, autentícate una vez:
+#   podman login ghcr.io
 Volume=%h/twitch-clip-downloader/output:/app/output:Z
 Volume=%h/twitch-clip-downloader/config.json:/app/config.json:ro,Z
 # Alternativa con variables de entorno en lugar de config.json:

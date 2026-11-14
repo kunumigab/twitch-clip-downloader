@@ -55,15 +55,24 @@ También puedes usar variables de entorno en lugar del archivo:
 
 ## Uso
 
-### Podman (recomendado)
+### Podman con imagen de GHCR (recomendado)
+
+GitHub Actions construye y publica la imagen en `ghcr.io` en cada push a `main`
+(y en tags `v*`). No hace falta build local:
 
 ```bash
-podman build -t twitch-clip-downloader:latest .
+podman pull ghcr.io/OWNER/REPO:latest
 podman run --rm \
   -v ./output:/app/output:Z \
   -v ./config.json:/app/config.json:ro,Z \
-  twitch-clip-downloader:latest
+  ghcr.io/OWNER/REPO:latest
 ```
+
+Si el paquete es privado, autentícate primero con un PAT con scope `read:packages`:
+`podman login ghcr.io`. Para hacerlo público: repo → Packages → Package settings →
+Change visibility.
+
+También puedes construir localmente: `podman build -t twitch-clip-downloader:latest .`
 
 ### Ejecución periódica con systemd (Quadlet, rootless)
 

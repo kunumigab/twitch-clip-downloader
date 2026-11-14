@@ -24,7 +24,8 @@ Alternativas consideradas:
 .
 ├── AGENTS.md            # este archivo (seguimiento del proyecto)
 ├── README.md            # documentación de uso
-├── Dockerfile                     # usado por podman build
+├── Dockerfile                     # usado por podman build y por CI
+├── .github/workflows/build.yml    # CI: build + push a ghcr.io
 ├── twitch-clip-downloader.container  # unit Quadlet (systemd)
 ├── twitch-clip-downloader.timer      # timer systemd (ejecución periódica)
 ├── requirements.txt
@@ -48,7 +49,11 @@ Alternativas consideradas:
 ## Uso
 
 ```bash
-# Podman (recomendado)
+# Podman con imagen de GHCR (recomendado; la publica GitHub Actions)
+podman pull ghcr.io/OWNER/REPO:latest
+podman run --rm -v ./output:/app/output:Z -v ./config.json:/app/config.json:ro,Z ghcr.io/OWNER/REPO:latest
+
+# O build local
 podman build -t twitch-clip-downloader:latest .
 podman run --rm -v ./output:/app/output:Z -v ./config.json:/app/config.json:ro,Z twitch-clip-downloader:latest
 
@@ -87,3 +92,4 @@ Opciones:
 
 - 2026-11-14: Creación inicial del proyecto (Python + yt-dlp + Helix API + Docker).
 - 2026-11-14: Docker reemplazado por Podman + Quadlet (unit `.container` + `.timer`).
+- 2026-11-14: CI con GitHub Actions: build y push de la imagen a ghcr.io.
