@@ -23,6 +23,7 @@ Alternativas consideradas:
 ```
 .
 ├── AGENTS.md            # este archivo (seguimiento del proyecto)
+├── README.md            # documentación de uso
 ├── Dockerfile                     # usado por podman build
 ├── twitch-clip-downloader.container  # unit Quadlet (systemd)
 ├── twitch-clip-downloader.timer      # timer systemd (ejecución periódica)
