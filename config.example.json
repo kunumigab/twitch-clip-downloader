@@ -1,0 +1,10 @@
+{
+  "twitch": {
+    "client_id": "TU_CLIENT_ID",
+    "client_secret": "TU_CLIENT_SECRET",
+    "channels": ["nombre_del_canal"]
+  },
+  "default_since_days": 30,
+  "max_per_channel": 0,
+  "output_dir": "output"
+}

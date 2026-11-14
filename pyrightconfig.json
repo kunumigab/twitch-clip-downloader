@@ -1,0 +1,5 @@
+{
+  "extraPaths": ["D:\\GH\\binaries\\python\\Lib\\site-packages"],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "standard"
+}
