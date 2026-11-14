@@ -58,7 +58,8 @@ También puedes usar variables de entorno en lugar del archivo:
 ### Podman con imagen de GHCR (recomendado)
 
 GitHub Actions construye y publica la imagen en `ghcr.io` en cada push a `main`
-(y en tags `v*`). No hace falta build local:
+(y en tags `v*`), para **linux/amd64 y linux/arm64** (multi-arch vía QEMU), así que
+funciona igual en VMs ARM baratas y en x86_64. No hace falta build local:
 
 ```bash
 podman pull ghcr.io/OWNER/REPO:latest

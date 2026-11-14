@@ -93,3 +93,4 @@ Opciones:
 - 2026-11-14: Creación inicial del proyecto (Python + yt-dlp + Helix API + Docker).
 - 2026-11-14: Docker reemplazado por Podman + Quadlet (unit `.container` + `.timer`).
 - 2026-11-14: CI con GitHub Actions: build y push de la imagen a ghcr.io.
+- 2026-11-14: Imagen multi-arquitectura (linux/amd64 + linux/arm64) vía QEMU en CI.
