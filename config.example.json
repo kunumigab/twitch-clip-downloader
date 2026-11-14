@@ -6,5 +6,17 @@
   },
   "default_since_days": 30,
   "max_per_channel": 0,
-  "output_dir": "output"
+
+  "storage": "local",
+  "output_dir": "output",
+
+  "s3": {
+    "endpoint_url": "https://s3.us-east-1.amazonaws.com",
+    "bucket": "mi-bucket",
+    "prefix": "twitch-clips",
+    "region": "us-east-1",
+    "access_key_id": "TU_ACCESS_KEY",
+    "secret_access_key": "TU_SECRET_KEY",
+    "keep_local": false
+  }
 }

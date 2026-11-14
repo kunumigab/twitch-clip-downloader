@@ -76,7 +76,8 @@ Opciones:
 - [x] Estructura inicial, Dockerfile, config de ejemplo
 - [x] Listado de clips vía API Helix con paginación
 - [x] Descarga con yt-dlp organizada por fecha + metadatos JSON
-- [x] Estado persistente (`output/.downloaded.json`) para no re-descargar
+- [x] Estado persistente (`output/.downloaded.json` o en S3) para no re-descargar
+- [x] Almacenamiento configurable: local (`output_dir`) o S3 compatible (AWS, MinIO, R2, B2...)
 - [ ] Subida automática a YouTube (pendiente, requiere OAuth de YouTube)
 - [x] Programación periódica vía timer de systemd + Quadlet (`twitch-clip-downloader.timer`)
 - [ ] Renombrado/plantillas de título para YouTube
@@ -86,7 +87,8 @@ Opciones:
 - Los clips de Twitch caducan (~14-60 días según el canal); conviene ejecutar periódicamente.
 - La API Helix requiere token de app (client credentials), no de usuario.
 - Los nombres de archivo se sanean (sin caracteres ilegales en Windows).
-- El estado se guarda en `output/.downloaded.json`; borrarlo fuerza re-descarga.
+- El estado se guarda en `output/.downloaded.json` (local) o en `s3://<bucket>/<prefix>/.downloaded.json` (modo S3); borrarlo fuerza re-descarga.
+- En modo S3, `output_dir` actúa como staging temporal; con `keep_local: false` las copias locales se borran tras subir.
 
 ## Historial
 
@@ -94,3 +96,4 @@ Opciones:
 - 2026-11-14: Docker reemplazado por Podman + Quadlet (unit `.container` + `.timer`).
 - 2026-11-14: CI con GitHub Actions: build y push de la imagen a ghcr.io.
 - 2026-11-14: Imagen multi-arquitectura (linux/amd64 + linux/arm64) vía QEMU en CI.
+- 2026-11-14: Almacenamiento configurable: local o S3 compatible (boto3), con estado también en S3.

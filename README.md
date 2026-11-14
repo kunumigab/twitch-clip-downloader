@@ -46,12 +46,49 @@ Copia `config.example.json` a `config.json` y rellena:
   },
   "default_since_days": 30,
   "max_per_channel": 0,
+  "storage": "local",
   "output_dir": "output"
 }
 ```
 
 También puedes usar variables de entorno en lugar del archivo:
 `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `TWITCH_CHANNELS=canal1,canal2`.
+
+### Almacenamiento: local o S3 compatible
+
+`storage` puede ser `local` (por defecto) o `s3` (cualquier almacenamiento
+compatible con S3: AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi...).
+
+**Local** — los clips se guardan en `output_dir` (o `OUTPUT_DIR`):
+
+```json
+{ "storage": "local", "output_dir": "/ruta/a/clips" }
+```
+
+**S3** — los clips se suben a `s3://<bucket>/<prefix>/YYYY-MM-DD/` y, salvo que
+`keep_local` sea `true`, las copias locales se borran tras subir. El estado
+(`.downloaded.json`) también se guarda en el bucket, así que el contenedor puede
+ser efímero:
+
+```json
+{
+  "storage": "s3",
+  "output_dir": "output",
+  "s3": {
+    "endpoint_url": "https://s3.us-east-1.amazonaws.com",
+    "bucket": "mi-bucket",
+    "prefix": "twitch-clips",
+    "region": "us-east-1",
+    "access_key_id": "TU_ACCESS_KEY",
+    "secret_access_key": "TU_SECRET_KEY",
+    "keep_local": false
+  }
+}
+```
+
+Variables de entorno equivalentes: `STORAGE`, `OUTPUT_DIR`, `S3_ENDPOINT_URL`,
+`S3_BUCKET`, `S3_PREFIX`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
+En modo S3, `output_dir` se usa solo como staging temporal.
 
 ## Uso
 
@@ -108,7 +145,7 @@ python src/downloader.py --config config.json
 - Los clips de Twitch caducan (~14–60 días según el canal): conviene ejecutar
   el bot periódicamente.
 - Los nombres de archivo se sanean (sin caracteres ilegales en Windows).
-- Borrar `output/.downloaded.json` fuerza la re-descarga de todo.
+- Borrar `output/.downloaded.json` (o `s3://<bucket>/<prefix>/.downloaded.json` en modo S3) fuerza la re-descarga de todo.
 - La subida automática a YouTube está pendiente (requiere OAuth de YouTube).
 
 ## Estructura del proyecto

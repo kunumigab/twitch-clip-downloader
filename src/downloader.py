@@ -30,16 +30,38 @@ def load_config(path: str) -> dict:
         else tw.get("channels", [])
     )
     if not client_id or not client_secret:
-        sys.exit("ERROR: faltan TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET (config.yaml o entorno)")
+        sys.exit("ERROR: faltan TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET (config.json o entorno)")
     if not channels:
         sys.exit("ERROR: no hay canales configurados (twitch.channels o TWITCH_CHANNELS)")
+
+    storage = os.environ.get("STORAGE") or cfg.get("storage", "local")
+    if storage not in ("local", "s3"):
+        sys.exit(f"ERROR: storage debe ser 'local' o 's3', no {storage!r}")
+
+    s3_cfg = cfg.get("s3", {})
+    s3 = {
+        "endpoint_url": os.environ.get("S3_ENDPOINT_URL") or s3_cfg.get("endpoint_url"),
+        "bucket": os.environ.get("S3_BUCKET") or s3_cfg.get("bucket"),
+        "prefix": (os.environ.get("S3_PREFIX") or s3_cfg.get("prefix", "")).strip("/"),
+        "region": os.environ.get("S3_REGION") or s3_cfg.get("region", "us-east-1"),
+        "access_key_id": os.environ.get("S3_ACCESS_KEY_ID") or s3_cfg.get("access_key_id"),
+        "secret_access_key": os.environ.get("S3_SECRET_ACCESS_KEY") or s3_cfg.get("secret_access_key"),
+        "keep_local": bool(s3_cfg.get("keep_local", False)),
+    }
+    if storage == "s3":
+        missing = [k for k in ("endpoint_url", "bucket", "access_key_id", "secret_access_key") if not s3[k]]
+        if missing:
+            sys.exit(f"ERROR: faltan claves s3 en config.json o entorno: {', '.join(missing)}")
+
     return {
         "client_id": client_id,
         "client_secret": client_secret,
         "channels": channels,
         "default_since_days": cfg.get("default_since_days", 30),
         "max_per_channel": cfg.get("max_per_channel", 0),
-        "output_dir": Path(cfg.get("output_dir", "output")),
+        "output_dir": Path(os.environ.get("OUTPUT_DIR") or cfg.get("output_dir", "output")),
+        "storage": storage,
+        "s3": s3,
     }
 
 
@@ -97,20 +119,57 @@ def sanitize(name: str, max_len: int = 80) -> str:
     return name[:max_len].rstrip("._") or "clip"
 
 
-def load_state(output_dir: Path) -> set:
-    state_file = output_dir / ".downloaded.json"
+def s3_client(s3: dict):
+    import boto3
+
+    return boto3.client(
+        "s3",
+        endpoint_url=s3["endpoint_url"],
+        region_name=s3["region"],
+        aws_access_key_id=s3["access_key_id"],
+        aws_secret_access_key=s3["secret_access_key"],
+    )
+
+
+def s3_key(s3: dict, *parts: str) -> str:
+    return "/".join(p for p in (s3["prefix"], *parts) if p)
+
+
+def load_state(cfg: dict) -> set:
+    if cfg["storage"] == "s3":
+        from botocore.exceptions import ClientError
+
+        try:
+            obj = s3_client(cfg["s3"]).get_object(
+                Bucket=cfg["s3"]["bucket"], Key=s3_key(cfg["s3"], ".downloaded.json")
+            )
+            return set(json.loads(obj["Body"].read()))
+        except ClientError:
+            return set()
+    state_file = cfg["output_dir"] / ".downloaded.json"
     if state_file.exists():
         return set(json.loads(state_file.read_text(encoding="utf-8")))
     return set()
 
 
-def save_state(output_dir: Path, state: set) -> None:
-    (output_dir / ".downloaded.json").write_text(
-        json.dumps(sorted(state), indent=2), encoding="utf-8"
-    )
+def save_state(cfg: dict, state: set) -> None:
+    payload = json.dumps(sorted(state), indent=2)
+    if cfg["storage"] == "s3":
+        s3_client(cfg["s3"]).put_object(
+            Bucket=cfg["s3"]["bucket"],
+            Key=s3_key(cfg["s3"], ".downloaded.json"),
+            Body=payload.encode("utf-8"),
+            ContentType="application/json",
+        )
+        return
+    (cfg["output_dir"] / ".downloaded.json").write_text(payload, encoding="utf-8")
 
 
-def download_clip(clip: dict, dest_dir: Path, base_name: str) -> bool:
+def upload_to_s3(cfg: dict, local_path: Path, key: str) -> None:
+    s3_client(cfg["s3"]).upload_file(str(local_path), cfg["s3"]["bucket"], key)
+
+
+def download_clip(clip: dict, dest_dir: Path, base_name: str) -> list[Path]:
     import yt_dlp
     from yt_dlp.utils import DownloadError
 
@@ -119,10 +178,10 @@ def download_clip(clip: dict, dest_dir: Path, base_name: str) -> bool:
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([clip["url"]])
-        return True
+        return sorted(dest_dir.glob(f"{base_name}.*"))
     except DownloadError as e:
         print(f"  ERROR descargando {clip['url']}: {e}")
-        return False
+        return []
 
 
 def main() -> None:
@@ -145,7 +204,7 @@ def main() -> None:
     max_per_channel = args.max if args.max is not None else cfg["max_per_channel"]
 
     token = get_app_token(cfg["client_id"], cfg["client_secret"])
-    state = load_state(output_dir)
+    state = load_state(cfg)
 
     for channel in cfg["channels"]:
         print(f"\n== Canal: {channel} ==")
@@ -179,12 +238,28 @@ def main() -> None:
                 continue
             day_dir.mkdir(parents=True, exist_ok=True)
             print(f"  Descargando: {clip['title']}")
-            if download_clip(clip, day_dir, base):
-                (day_dir / f"{base}.json").write_text(
-                    json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-                )
-                state.add(clip["id"])
-                save_state(output_dir, state)
+            files = download_clip(clip, day_dir, base)
+            if not files:
+                continue
+            meta_path = day_dir / f"{base}.json"
+            meta_path.write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            files.append(meta_path)
+            if cfg["storage"] == "s3":
+                day = created.strftime("%Y-%m-%d")
+                for f in files:
+                    upload_to_s3(cfg, f, s3_key(cfg["s3"], day, f.name))
+                print(f"  Subido a s3://{cfg['s3']['bucket']}/{s3_key(cfg['s3'], day)}/")
+                if not cfg["s3"]["keep_local"]:
+                    for f in files:
+                        f.unlink()
+                    try:
+                        day_dir.rmdir()
+                    except OSError:
+                        pass
+            state.add(clip["id"])
+            save_state(cfg, state)
 
     print("\nListo.")
 
