@@ -67,7 +67,11 @@ python src/downloader.py --config config.json
 ```
 
 Opciones:
-- `--since YYYY-MM-DD`: solo clips creados desde esa fecha (por defecto: últimos 30 días).
+- `--since YYYY-MM-DD` / `--until YYYY-MM-DD`: rango de fechas de creación.
+- `--days N`: clips de los últimos N días.
+- `--month YYYY-MM`: clips de un mes concreto.
+- `--year YYYY`: clips de un año concreto.
+- `--all`: descarga todos los clips, sin filtro de fecha.
 - `--max N`: máximo de clips por canal por ejecución.
 - `--dry-run`: lista lo que descargaría sin descargar.
 
@@ -97,3 +101,5 @@ Opciones:
 - 2026-11-14: CI con GitHub Actions: build y push de la imagen a ghcr.io.
 - 2026-11-14: Imagen multi-arquitectura (linux/amd64 + linux/arm64) vía QEMU en CI.
 - 2026-11-14: Almacenamiento configurable: local o S3 compatible (boto3), con estado también en S3.
+- 2026-11-18: Filtros de fecha CLI (`--days`, `--month`, `--year`, `--since`/`--until`, `--all`).
+- 2026-11-18: Timer de systemd documentado como modo automático/manual configurable (`OnCalendar=`).

@@ -125,6 +125,17 @@ systemctl --user enable --now twitch-clip-downloader.timer
 El timer ejecuta el servicio a diario (`OnCalendar=daily`). Quadlet/systemd solo
 funciona en Linux; en Windows usa WSL2 o Task Scheduler.
 
+#### Modo automático vs. manual
+
+- **Automático**: habilita el timer como se indica arriba. La frecuencia se
+  configura editando `OnCalendar=` en `twitch-clip-downloader.timer`
+  (`hourly`, `*:0/30`, `daily`, `weekly`...) y luego
+  `systemctl --user daemon-reload && systemctl --user restart twitch-clip-downloader.timer`.
+- **Manual**: no habilites el timer (o deshabilítalo con
+  `systemctl --user disable --now twitch-clip-downloader.timer`) y ejecuta una
+  pasada bajo demanda con `systemctl --user start twitch-clip-downloader.service`
+  o con `podman run --rm ... ghcr.io/OWNER/REPO:latest`.
+
 ### Local
 
 ```bash
@@ -137,6 +148,11 @@ python src/downloader.py --config config.json
 | Opción | Descripción |
 |---|---|
 | `--since YYYY-MM-DD` | Solo clips creados desde esa fecha (por defecto: últimos 30 días) |
+| `--until YYYY-MM-DD` | Solo clips creados hasta esa fecha (inclusive) |
+| `--days N` | Clips de los últimos N días |
+| `--month YYYY-MM` | Clips de un mes concreto |
+| `--year YYYY` | Clips de un año concreto |
+| `--all` | Descargar todos los clips, sin filtro de fecha |
 | `--max N` | Máximo de clips por canal por ejecución (0 = sin límite) |
 | `--dry-run` | Lista lo que descargaría sin descargar nada |
 
