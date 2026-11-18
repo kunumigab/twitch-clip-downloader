@@ -83,7 +83,7 @@ def helix_get(path: str, token: str, client_id: str, params: dict[str, str | int
     r = requests.get(
         f"{HELIX}{path}",
         headers={"Authorization": f"Bearer {token}", "Client-Id": client_id},
-        params=params,
+        params=params,  # type: ignore[arg-type]
         timeout=30,
     )
     r.raise_for_status()
@@ -95,14 +95,23 @@ def get_broadcaster_id(channel: str, token: str, client_id: str) -> str | None:
     return data[0]["id"] if data else None
 
 
-def list_clips(broadcaster_id: str, token: str, client_id: str, since: datetime) -> list[dict]:
+def list_clips(
+    broadcaster_id: str,
+    token: str,
+    client_id: str,
+    since: datetime | None,
+    until: datetime | None = None,
+) -> list[dict]:
     clips, cursor = [], None
     while True:
-        params = {
+        params: dict[str, str | int] = {
             "broadcaster_id": broadcaster_id,
             "first": 100,
-            "started_at": since.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
+        if since:
+            params["started_at"] = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if until:
+            params["ended_at"] = until.strftime("%Y-%m-%dT%H:%M:%SZ")
         if cursor:
             params["after"] = cursor
         resp = helix_get("/clips", token, client_id, params)
@@ -120,7 +129,7 @@ def sanitize(name: str, max_len: int = 80) -> str:
 
 
 def s3_client(s3: dict):
-    import boto3
+    import boto3  # type: ignore[import-not-found]
 
     return boto3.client(
         "s3",
@@ -137,7 +146,7 @@ def s3_key(s3: dict, *parts: str) -> str:
 
 def load_state(cfg: dict) -> set:
     if cfg["storage"] == "s3":
-        from botocore.exceptions import ClientError
+        from botocore.exceptions import ClientError  # type: ignore[import-not-found]
 
         try:
             obj = s3_client(cfg["s3"]).get_object(
@@ -170,13 +179,13 @@ def upload_to_s3(cfg: dict, local_path: Path, key: str) -> None:
 
 
 def download_clip(clip: dict, dest_dir: Path, base_name: str) -> list[Path]:
-    import yt_dlp
-    from yt_dlp.utils import DownloadError
+    import yt_dlp  # type: ignore[import-not-found]
+    from yt_dlp.utils import DownloadError  # type: ignore[import-not-found]
 
     out_template = str(dest_dir / f"{base_name}.%(ext)s")
     opts = {"outtmpl": out_template, "quiet": True, "no_warnings": True}
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with yt_dlp.YoutubeDL(opts) as ydl:  # type: ignore[arg-type]
             ydl.download([clip["url"]])
         return sorted(dest_dir.glob(f"{base_name}.*"))
     except DownloadError as e:
@@ -188,6 +197,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Descarga clips de Twitch por canal")
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--since", help="Fecha mínima de creación (YYYY-MM-DD)")
+    ap.add_argument("--until", help="Fecha máxima de creación (YYYY-MM-DD)")
+    ap.add_argument("--days", type=int, help="Clips de los últimos N días")
+    ap.add_argument("--month", help="Clips de un mes concreto (YYYY-MM)")
+    ap.add_argument("--year", help="Clips de un año concreto (YYYY)")
+    ap.add_argument("--all", action="store_true", help="Descargar todos los clips (sin filtro de fecha)")
     ap.add_argument("--max", type=int, default=None, help="Máx. clips por canal")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
@@ -196,11 +210,30 @@ def main() -> None:
     output_dir: Path = cfg["output_dir"]
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    since = (
-        datetime.strptime(args.since, "%Y-%m-%d").replace(tzinfo=UTC)
-        if args.since
-        else datetime.now(UTC) - timedelta(days=cfg["default_since_days"])
+    now = datetime.now(UTC)
+    since: datetime | None
+    until: datetime | None = (
+        datetime.strptime(args.until, "%Y-%m-%d").replace(tzinfo=UTC) + timedelta(days=1)
+        if args.until
+        else None
     )
+    if args.all:
+        since = None
+    elif args.month:
+        since = datetime.strptime(args.month + "-01", "%Y-%m-%d").replace(tzinfo=UTC)
+        if since.month == 12:
+            until = datetime(since.year + 1, 1, 1, tzinfo=UTC)
+        else:
+            until = datetime(since.year, since.month + 1, 1, tzinfo=UTC)
+    elif args.year:
+        since = datetime(int(args.year), 1, 1, tzinfo=UTC)
+        until = datetime(int(args.year) + 1, 1, 1, tzinfo=UTC)
+    elif args.days is not None:
+        since = now - timedelta(days=args.days)
+    elif args.since:
+        since = datetime.strptime(args.since, "%Y-%m-%d").replace(tzinfo=UTC)
+    else:
+        since = now - timedelta(days=cfg["default_since_days"])
     max_per_channel = args.max if args.max is not None else cfg["max_per_channel"]
 
     token = get_app_token(cfg["client_id"], cfg["client_secret"])
@@ -212,11 +245,14 @@ def main() -> None:
         if not bid:
             print(f"  Canal no encontrado: {channel}")
             continue
-        clips = list_clips(bid, token, cfg["client_id"], since)
+        clips = list_clips(bid, token, cfg["client_id"], since, until)
         clips.sort(key=lambda c: c["created_at"])
         if max_per_channel:
             clips = clips[-max_per_channel:]
-        print(f"  {len(clips)} clips desde {since.date()}")
+        rango = f"desde {since.date()}" if since else "todos"
+        if until:
+            rango += f" hasta {(until - timedelta(seconds=1)).date()}"
+        print(f"  {len(clips)} clips ({rango})")
 
         for clip in clips:
             if clip["id"] in state:

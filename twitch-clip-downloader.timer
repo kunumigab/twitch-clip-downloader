@@ -1,8 +1,21 @@
 # Timer de systemd para ejecutar el downloader periódicamente.
-# Instalación (rootless):
+#
+# Modo automático (instalación, rootless):
 #   cp twitch-clip-downloader.timer ~/.config/containers/systemd/
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now twitch-clip-downloader.timer
+#
+# Modo manual (sin timer; ejecutar bajo demanda):
+#   systemctl --user disable --now twitch-clip-downloader.timer
+#   systemctl --user start twitch-clip-downloader.service   # una pasada
+#   # o: podman run --rm ... ghcr.io/OWNER/REPO:latest
+#
+# Frecuencia configurable vía OnCalendar (ejemplos):
+#   OnCalendar=hourly        cada hora
+#   OnCalendar=*:0/30        cada 30 minutos
+#   OnCalendar=daily         una vez al día (por defecto)
+#   OnCalendar=weekly        una vez a la semana
+# Tras editar: systemctl --user daemon-reload && systemctl --user restart twitch-clip-downloader.timer
 
 [Unit]
 Description=Ejecutar Twitch Clip Downloader periódicamente
