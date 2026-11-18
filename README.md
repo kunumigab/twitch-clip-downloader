@@ -110,6 +110,25 @@ Si el paquete es privado, autentícate primero con un PAT con scope `read:packag
 `podman login ghcr.io`. Para hacerlo público: repo → Packages → Package settings →
 Change visibility.
 
+#### Tags de la imagen y actualización automática
+
+Cada push a `main` publica dos tags apuntando a la misma imagen: `latest`
+(mutable, se sobrescribe en cada build) y `sha-<commit>` (inmutable). Los tags
+semver (`1.2.3`, `1.2`) solo se generan al crear un tag git `v*`.
+
+- Con `:latest`, `podman run` **no** actualiza la imagen local por sí solo;
+  hay que hacer `podman pull` explícito.
+- El unit Quadlet (`twitch-clip-downloader.container`) incluye
+  `AutoUpdate=registry`, que hace que Podman compruebe el registro y actualice
+  la imagen en cada arranque del servicio. Requiere el timer de auto-update:
+
+  ```bash
+  systemctl --user enable --now podman-auto-update.timer
+  ```
+
+- Si prefieres un tag inmutable (`sha-...` o semver) para máxima
+  reproducibilidad, fija ese tag en el `.container` y elimina `AutoUpdate=registry`.
+
 También puedes construir localmente: `podman build -t twitch-clip-downloader:latest .`
 
 ### Ejecución periódica con systemd (Quadlet, rootless)
