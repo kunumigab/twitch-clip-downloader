@@ -53,10 +53,22 @@ def load_config(path: str) -> dict:
         if missing:
             sys.exit(f"ERROR: faltan claves s3 en config.json o entorno: {', '.join(missing)}")
 
+    yt_cfg = cfg.get("youtube", {})
+    youtube = {
+        "client_id": os.environ.get("YOUTUBE_CLIENT_ID") or yt_cfg.get("client_id"),
+        "client_secret": os.environ.get("YOUTUBE_CLIENT_SECRET") or yt_cfg.get("client_secret"),
+        "tokens_file": Path(os.environ.get("YOUTUBE_TOKENS_FILE") or yt_cfg.get("tokens_file", "youtube_tokens.json")),
+        "privacy_status": yt_cfg.get("privacy_status", "private"),
+        "channel_map": yt_cfg.get("channel_map", {}),
+        "auto_upload": bool(yt_cfg.get("auto_upload", False)),
+        "title_template": yt_cfg.get("title_template", "{title}"),
+    }
+
     return {
         "client_id": client_id,
         "client_secret": client_secret,
         "channels": channels,
+        "youtube": youtube,
         "default_since_days": cfg.get("default_since_days", 30),
         "max_per_channel": cfg.get("max_per_channel", 0),
         "output_dir": Path(os.environ.get("OUTPUT_DIR") or cfg.get("output_dir", "output")),
@@ -178,6 +190,38 @@ def upload_to_s3(cfg: dict, local_path: Path, key: str) -> None:
     s3_client(cfg["s3"]).upload_file(str(local_path), cfg["s3"]["bucket"], key)
 
 
+def maybe_upload_youtube(cfg: dict, channel: str, clip: dict, video_files: list[Path],
+                          meta_path: Path) -> None:
+    yt = cfg["youtube"]
+    if not yt["auto_upload"]:
+        return
+    profile = yt["channel_map"].get(channel)
+    if not profile:
+        print(f"  YouTube: sin perfil para canal '{channel}' (channel_map), omitiendo subida")
+        return
+    if not yt["client_id"] or not yt["client_secret"]:
+        print("  YouTube: faltan youtube.client_id / youtube.client_secret, omitiendo subida")
+        return
+    videos = [f for f in video_files if f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov")]
+    if not videos:
+        print("  YouTube: no se encontró el vídeo descargado, omitiendo subida")
+        return
+    sys.path.insert(0, str(Path(__file__).parent))
+    import youtube_upload
+
+    yt_full = {**yt, "output_dir": cfg["output_dir"]}
+    uploaded = youtube_upload.load_uploaded(cfg["output_dir"])
+    if clip["id"] in uploaded:
+        print("  YouTube: ya subido anteriormente, omitiendo")
+        return
+    try:
+        youtube_upload.upload_video(yt_full, profile, videos[0], meta_path, yt["privacy_status"])
+        uploaded.add(clip["id"])
+        youtube_upload.save_uploaded(cfg["output_dir"], uploaded)
+    except Exception as e:
+        print(f"  YouTube: ERROR subiendo {videos[0].name}: {e}")
+
+
 def download_clip(clip: dict, dest_dir: Path, base_name: str) -> list[Path]:
     import yt_dlp  # type: ignore[import-not-found]
     from yt_dlp.utils import DownloadError  # type: ignore[import-not-found]
@@ -204,9 +248,12 @@ def main() -> None:
     ap.add_argument("--all", action="store_true", help="Descargar todos los clips (sin filtro de fecha)")
     ap.add_argument("--max", type=int, default=None, help="Máx. clips por canal")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--no-upload", action="store_true", help="No subir a YouTube aunque auto_upload esté activo")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
+    if args.no_upload:
+        cfg["youtube"]["auto_upload"] = False
     output_dir: Path = cfg["output_dir"]
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -281,6 +328,7 @@ def main() -> None:
             meta_path.write_text(
                 json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
             )
+            maybe_upload_youtube(cfg, channel, clip, files, meta_path)
             files.append(meta_path)
             if cfg["storage"] == "s3":
                 day = created.strftime("%Y-%m-%d")

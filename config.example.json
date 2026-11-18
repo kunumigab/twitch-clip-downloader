@@ -10,6 +10,18 @@
   "storage": "local",
   "output_dir": "output",
 
+  "youtube": {
+    "client_id": "TU_YOUTUBE_CLIENT_ID",
+    "client_secret": "TU_YOUTUBE_CLIENT_SECRET",
+    "tokens_file": "youtube_tokens.json",
+    "privacy_status": "private",
+    "auto_upload": false,
+    "title_template": "{title} | {channel}",
+    "channel_map": {
+      "nombre_del_canal_twitch": "perfil_youtube"
+    }
+  },
+
   "s3": {
     "endpoint_url": "https://s3.us-east-1.amazonaws.com",
     "bucket": "mi-bucket",

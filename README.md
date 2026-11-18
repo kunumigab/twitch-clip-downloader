@@ -90,6 +90,57 @@ Variables de entorno equivalentes: `STORAGE`, `OUTPUT_DIR`, `S3_ENDPOINT_URL`,
 `S3_BUCKET`, `S3_PREFIX`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
 En modo S3, `output_dir` se usa solo como staging temporal.
 
+### Subida a YouTube
+
+Requiere una aplicación OAuth en Google Cloud (tipo **Aplicación de escritorio**)
+con la **YouTube Data API v3** habilitada. Tu cuenta debe tener rol **Administrador
+o Editor** en el canal de destino (propio o de marca); no hace falta ser propietario.
+
+1. Añade a `config.json`:
+
+   ```json
+   "youtube": {
+     "client_id": "TU_YOUTUBE_CLIENT_ID",
+     "client_secret": "TU_YOUTUBE_CLIENT_SECRET",
+     "tokens_file": "youtube_tokens.json",
+     "privacy_status": "private",
+     "auto_upload": false,
+     "title_template": "{title} | {channel}",
+     "channel_map": { "canal_twitch": "perfil_youtube" }
+   }
+   ```
+
+2. Autoriza cada canal una vez (se abre el navegador; elige el canal correcto):
+
+   ```bash
+   python src/youtube_auth.py --config config.json --authorize perfil_youtube
+   python src/youtube_auth.py --config config.json --list
+   ```
+
+3. Sube vídeos:
+
+   ```bash
+   # Todos los clips locales pendientes (según channel_map)
+   python src/youtube_upload.py --config config.json --pending
+
+   # Un vídeo concreto
+   python src/youtube_upload.py --config config.json --profile perfil_youtube video.mp4
+   ```
+
+   Con `"auto_upload": true`, el downloader sube cada clip a YouTube justo tras
+   descargarlo (antes de borrar los locales en modo S3). Usa `--no-upload` para
+   desactivarlo en una ejecución. Las subidas se registran en `output/.uploaded.json`.
+
+`title_template` admite `{title}`, `{channel}`, `{date}` e `{id}` (máx. 100 caracteres).
+`privacy_status`: `private` (por defecto), `unlisted` o `public`.
+
+Notas:
+- No existe *service account* para YouTube: siempre OAuth con un usuario real.
+- Si la app OAuth está en modo "Testing", los refresh tokens caducan a los 7 días;
+  publícala o re-autoriza periódicamente.
+- Cuota de la API: `videos.insert` cuesta ~1600 unidades (10.000/día por defecto).
+- `youtube_tokens.json` contiene refresh tokens: no lo subas a git (ya está en `.gitignore`).
+
 ## Uso
 
 ### Podman con imagen de GHCR (recomendado)
@@ -174,6 +225,7 @@ python src/downloader.py --config config.json
 | `--all` | Descargar todos los clips, sin filtro de fecha |
 | `--max N` | Máximo de clips por canal por ejecución (0 = sin límite) |
 | `--dry-run` | Lista lo que descargaría sin descargar nada |
+| `--no-upload` | No subir a YouTube aunque `auto_upload` esté activo |
 
 ## Notas
 
@@ -181,7 +233,7 @@ python src/downloader.py --config config.json
   el bot periódicamente.
 - Los nombres de archivo se sanean (sin caracteres ilegales en Windows).
 - Borrar `output/.downloaded.json` (o `s3://<bucket>/<prefix>/.downloaded.json` en modo S3) fuerza la re-descarga de todo.
-- La subida automática a YouTube está pendiente (requiere OAuth de YouTube).
+- La subida a YouTube es opcional y está desactivada por defecto (`auto_upload: false`).
 
 ## Estructura del proyecto
 
@@ -194,5 +246,7 @@ python src/downloader.py --config config.json
 ├── requirements.txt
 ├── config.example.json
 ├── src/downloader.py               # lógica principal
+├── src/youtube_auth.py             # autorización OAuth de canales de YouTube
+├── src/youtube_upload.py           # subida de vídeos a YouTube
 └── output/                         # clips descargados (por fecha)
 ```
