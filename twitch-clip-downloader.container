@@ -16,6 +16,9 @@ Wants=network-online.target
 # Imagen publicada por GitHub Actions en GHCR.
 # Sustituye OWNER/REPO por tu usuario/organización y repositorio.
 Image=ghcr.io/OWNER/REPO:latest
+# Actualiza la imagen automáticamente desde el registro en cada arranque
+# (requiere que el tag sea mutable, como `latest`).
+AutoUpdate=registry
 # Si el paquete es privado, autentícate una vez:
 #   podman login ghcr.io
 Volume=%h/twitch-clip-downloader/output:/app/output:Z
