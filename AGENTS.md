@@ -31,7 +31,9 @@ Alternativas consideradas:
 ├── requirements.txt
 ├── config.example.json  # copia a config.json y edita
 ├── src/
-│   └── downloader.py    # lógica principal
+│   ├── downloader.py    # lógica principal
+│   ├── youtube_auth.py  # autorización OAuth de canales de YouTube
+│   └── youtube_upload.py # subida de vídeos a YouTube
 └── output/              # clips descargados (montado como volumen)
     └── YYYY-MM-DD/
         ├── <fecha>_<titulo>_<id>.mp4
@@ -82,9 +84,9 @@ Opciones:
 - [x] Descarga con yt-dlp organizada por fecha + metadatos JSON
 - [x] Estado persistente (`output/.downloaded.json` o en S3) para no re-descargar
 - [x] Almacenamiento configurable: local (`output_dir`) o S3 compatible (AWS, MinIO, R2, B2...)
-- [ ] Subida automática a YouTube (pendiente, requiere OAuth de YouTube)
+- [x] Subida automática a YouTube (OAuth por canal, `auto_upload`, `--no-upload`)
 - [x] Programación periódica vía timer de systemd + Quadlet (`twitch-clip-downloader.timer`)
-- [ ] Renombrado/plantillas de título para YouTube
+- [x] Renombrado/plantillas de título para YouTube (`youtube.title_template`)
 
 ## Notas y decisiones
 
@@ -103,3 +105,7 @@ Opciones:
 - 2026-11-14: Almacenamiento configurable: local o S3 compatible (boto3), con estado también en S3.
 - 2026-11-18: Filtros de fecha CLI (`--days`, `--month`, `--year`, `--since`/`--until`, `--all`).
 - 2026-11-18: Timer de systemd documentado como modo automático/manual configurable (`OnCalendar=`).
+- 2026-11-18: Fase 1 YouTube: `src/youtube_auth.py` autoriza canales (propios o de marca con rol admin/editor) vía OAuth y guarda refresh_tokens por perfil en `youtube_tokens.json`.
+- 2026-11-18: Fase 2 YouTube: `src/youtube_upload.py` sube vídeos (`videos.insert`, resumable), con `--pending` (usa `channel_map` y `.uploaded.json`) o subida directa con `--profile`.
+- 2026-11-18: Fase 3 YouTube: subida automática tras descarga en `downloader.py` (`youtube.auto_upload`, `--no-upload`); en modo S3 sube antes de borrar los locales.
+- 2026-11-18: Fase 4 YouTube: `youtube.title_template` (`{title}`, `{channel}`, `{date}`, `{id}`) y documentación en README.
